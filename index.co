@@ -40,18 +40,18 @@ module.exports = class Database
   alter: (key, alter, cb) ->
     nonconflictFails = 0
     do attempt = ->
-      get_doc_err, doc <- @get key
-      if get_doc_err
-        if ++nonconflictFails is MAX_ALTER_TRIES
-          return cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
-        retrySoon attempt, 500
+      tryOp = (op, cb) ->
+        err, result <- op!
+        if err
+          if err.error isnt \conflict and ++nonconflictFails is MAX_ALTER_TRIES
+            cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
+          else
+            retrySoon attempt
+        else
+          cb result
+      doc <- tryOp (cb) -> @get key, cb
       doc = alter doc
-      store_err <- @store key, doc
-      if store_err
-        if store_err?.error isnt \conflict
-          if ++nonconflictFails is MAX_ALTER_TRIES
-            return cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
-        retrySoon attempt, 500
+      store_err <- tryOp (cb) -> @store key, doc, cb
 
 retrySoon = (fn) ->
   setTimeout fn, Math.floor Math.random! * 500
