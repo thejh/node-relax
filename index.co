@@ -1,0 +1,57 @@
+request = require \request
+
+MAX_ALTER_TRIES = 10
+
+class Database
+  constructor: (options) ->
+    # set defaults
+    @host = \127.0.0.1
+    @port = 5984
+    @db_name = null
+    @ssl = false
+    # override defaults with options
+    import options
+  
+  # If the request fails: cb(error)
+  # If the response code indicates an error: cb(json)
+  # If everything seems to be ok: cb(null, json)
+  request: (method, {path}, cb) ->
+    protocol = if @ssl then \https else \http
+    url = "#{protocol}://#{@host}:#{@port}/#{@db_name}/#{path}"
+    opts = {url, method, json: true}
+    error, response, data <- request opts
+    return cb error if error?
+    if data is void
+      return cb new Error "invalid JSON returned from DB"
+    if response.statusCode >= 400
+      return cb data
+    cb null, data
+  
+  get: (key, cb) ->
+    key = encodeURIComponent key
+    @request \GET, path: key, cb
+  
+  store: (key, doc, cb) ->
+    key = encodeURIComponent key
+    error, result <- @request \PUT, path: key, json: doc
+    return cb error if error?
+    cb null
+  
+  alter: (key, alter, cb) ->
+    nonconflictFails = 0
+    do attempt = ->
+      get_doc_err, doc <- @get key
+      if get_doc_err
+        if ++nonconflictFails is MAX_ALTER_TRIES
+          return cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
+        retrySoon attempt, 500
+      doc = alter doc
+      store_err <- @store key, doc
+      if store_err
+        if store_err?.error isnt \conflict
+          if ++nonconflictFails is MAX_ALTER_TRIES
+            return cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
+        retrySoon attempt, 500
+
+retrySoon = (fn) ->
+  setTimeout fn, Math.floor Math.random! * 500
