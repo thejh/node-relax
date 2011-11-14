@@ -2,7 +2,7 @@ request = require \request
 
 MAX_ALTER_TRIES = 10
 
-class Database
+module.exports = class Database
   constructor: (options) ->
     # set defaults
     @host = \127.0.0.1
