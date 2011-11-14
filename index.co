@@ -41,7 +41,7 @@ module.exports = class Database
     nonconflictFails = 0
     do attempt = ->
       tryOp = (op, cb) ->
-        err, result <- op!
+        err, result <- op
         if err
           if err.error isnt \conflict and ++nonconflictFails is MAX_ALTER_TRIES
             cb new Error "could not alter the document in #{MAX_ALTER_TRIES} tries, not counting conflicts"
