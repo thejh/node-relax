@@ -3,7 +3,7 @@ request = require \request
 MAX_ALTER_TRIES = 10
 
 module.exports = class Database
-  constructor: (options) ->
+  (options) ->
     # set defaults
     @host = \127.0.0.1
     @port = 5984
@@ -15,10 +15,10 @@ module.exports = class Database
   # If the request fails: cb(error)
   # If the response code indicates an error: cb(json)
   # If everything seems to be ok: cb(null, json)
-  request: (method, {path}, cb) ->
+  request: (method, {path, body}, cb) ->
     protocol = if @ssl then \https else \http
     url = "#{protocol}://#{@host}:#{@port}/#{@db_name}/#{path}"
-    opts = {url, method, json: true}
+    opts = {url, method, json: true, body}
     error, response, data <- request opts
     return cb error if error?
     if data is void
@@ -33,14 +33,14 @@ module.exports = class Database
   
   store: (key, doc, cb) ->
     key = encodeURIComponent key
-    error, result <- @request \PUT, path: key, json: doc
+    error, result <- @request \PUT, path: key, body: doc
     return cb error if error?
     cb null
   
   alter: (key, alter, cb) ->
     nonconflictFails = 0
-    do attempt = ->
-      tryOp = (op, cb) ->
+    do attempt = ~>
+      tryOp = (op, opcb) ->
         err, result <- op
         if err
           if err.error isnt \conflict and ++nonconflictFails is MAX_ALTER_TRIES
@@ -48,10 +48,11 @@ module.exports = class Database
           else
             retrySoon attempt
         else
-          cb result
-      doc <- tryOp (cb) -> @get key, cb
+          opcb result
+      doc <~ tryOp (cb) ~> @get key, cb
       doc = alter doc
-      store_err <- tryOp (cb) -> @store key, doc, cb
+      <~ tryOp (cb) ~> @store key, doc, cb
+      cb null
 
 retrySoon = (fn) ->
   setTimeout fn, Math.floor Math.random! * 500
