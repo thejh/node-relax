@@ -28,7 +28,7 @@ High-Level API
     db.alter(id, function modify(doc){}, function done(err){})
 
 This method fetches the specified document, calls the `modify` callback on it
-and stores the result of that callback. If an error occurs, it repeats this
+and stores the result of that callback. If an error occurs, it waits, repeats this
 process, which means that it re-fetches the document, calls the `modify`
-callback on it again and tries to store it again. It fails after ten
-non-conflict errors.
+callback on it again and tries to store it again. It fails after ten errors
+(conflicts don't count).
