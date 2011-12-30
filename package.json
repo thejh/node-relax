@@ -11,5 +11,6 @@
   "dependencies": {
     "request": "*"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "tags": ["couchdb", "database", "client"]
 }
